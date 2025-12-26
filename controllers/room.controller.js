@@ -1,4 +1,5 @@
 import { supabase } from "../src/config/supabase.js";
+import { supabaseAuth } from "../src/config/supabaseAuth.js";
 
 export const createRoom = async (req, res) => {
     try {
@@ -36,15 +37,28 @@ export const joinRoom = async (req, res) => {
         const { roomName } = req.body;
         const userId = req.user.id;
 
-        // Find room by name
+        console.log("=== JOIN ROOM DEBUG ===");
+        console.log("Room name:", roomName);
+        console.log("User ID:", userId);
+        console.log("User object:", req.user);
+
+        // Find room by name using service role to bypass RLS
         const { data: room, error: roomError } = await supabase
             .from("private_rooms")
-            .select("id")
+            .select("id, room_name")
             .eq("room_name", roomName)
             .single();
 
+        console.log("Room query result:", room);
+        console.log("Room query error:", roomError);
+
         if (roomError || !room) {
-            return res.status(404).json({ error: "Room not found" });
+            console.log("Room not found - returning 404");
+            return res.status(404).json({ 
+                error: "Room not found", 
+                details: roomError,
+                searchedFor: roomName 
+            });
         }
 
         const roomId = room.id;
