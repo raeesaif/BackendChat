@@ -7,6 +7,20 @@ export const createRoom = async (req, res) => {
         if (!req.user) return res.status(401).json({ error: "Unauthorized" });
         const userId = req.user.id;
 
+        // Check if room name already exists
+        const { data: existingRoom } = await supabase
+            .from("private_rooms")
+            .select("id")
+            .eq("room_name", roomName)
+            .limit(1);
+
+        if (existingRoom && existingRoom.length > 0) {
+            return res.status(409).json({ 
+                error: "Room name already exists", 
+                message: "Room name already created. Please choose a unique name." 
+            });
+        }
+
         const { data: room, error } = await supabase
             .from("private_rooms")
             .insert({
@@ -37,23 +51,14 @@ export const joinRoom = async (req, res) => {
         const { roomName } = req.body;
         const userId = req.user.id;
 
-        console.log("=== JOIN ROOM DEBUG ===");
-        console.log("Room name:", roomName);
-        console.log("User ID:", userId);
-        console.log("User object:", req.user);
-
         // Find room by name using service role to bypass RLS
-        const { data: room, error: roomError } = await supabase
+        const { data: rooms, error: roomError } = await supabase
             .from("private_rooms")
             .select("id, room_name")
             .eq("room_name", roomName)
-            .single();
+            .limit(1);
 
-        console.log("Room query result:", room);
-        console.log("Room query error:", roomError);
-
-        if (roomError || !room) {
-            console.log("Room not found - returning 404");
+        if (roomError || !rooms || rooms.length === 0) {
             return res.status(404).json({ 
                 error: "Room not found", 
                 details: roomError,
@@ -61,6 +66,7 @@ export const joinRoom = async (req, res) => {
             });
         }
 
+        const room = rooms[0]; // Get first matching room
         const roomId = room.id;
 
         // Check if already a member
